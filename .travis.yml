@@ -5,6 +5,7 @@ php:
   - 5.5
   - 5.6
   - 7.0
+  - 7.1
 #  - hhvm
 
 # faster builds on new travis setup not using sudo
@@ -17,21 +18,22 @@ cache:
 
 install:
   - travis_retry composer self-update && composer --version
-  - travis_retry composer global require "fxp/composer-asset-plugin:~1.1.1"
-  - export PATH="$HOME/.composer/vendor/bin:$PATH"
-  - travis_retry composer install --dev --prefer-dist --no-interaction
-# codeception
-  - travis_retry composer global require "codeception/codeception=2.0.*" "codeception/specify=*" "codeception/verify=*"
+  - travis_retry composer update --dev --prefer-dist --no-interaction
+  # install php extensions
+  - |
+    if (php --version | grep -i HipHop > /dev/null); then
+      echo "Skipping imagick and gmagick tests on HHVM"
+    else
+      pear config-set preferred_state beta
+      printf "\n" | pecl install imagick
+      # gmagick is not installed on travis currently
+      #printf "\n" | pecl install gmagick
+    fi
 # setup application:
   - |
     sed -i "s/'cookieValidationKey' => ''/'cookieValidationKey' => 'testkey'/" config/web.php
-    cd tests
-    codecept build
-    cd ..
 
 script:
   - |
-    cd web
-    php -S localhost:8080 > /dev/null 2>&1 &
-    cd ../tests
-    codecept run
+    php -S localhost:8080 -t web > /dev/null 2>&1 &
+    vendor/bin/codecept run
